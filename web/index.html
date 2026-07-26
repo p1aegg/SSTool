@@ -209,12 +209,12 @@ const tools = [
   { name: 'AlternateStreamView', desc: 'View NTFS alternate data streams', link: 'https://www.nirsoft.net/utils/alternatestreamview-x64.zip', category: 'nirsoft' },
   { name: 'USBDeview', desc: 'Manage USB devices', link: 'https://www.nirsoft.net/utils/usbdeview-x64.zip', category: 'nirsoft' },
   { name: 'OpenSaveFilesView', desc: 'View Open/Save dialog history', link: 'https://www.nirsoft.net/utils/opensavefilesview-x64.zip', category: 'nirsoft' },
-  { name: 'ExecutedProgramsList', desc: 'List executed programs', link: 'https://www.nirsoft.net/utils/executedprogramslist-x64.zip', category: 'nirsoft' },
+  { name: 'ExecutedProgramsList', desc: 'List executed programs', link: 'https://www.nirsoft.net/utils/executedprogramslist.zip', category: 'nirsoft' },
   { name: 'TaskSchedulerView', desc: 'View scheduled tasks', link: 'https://www.nirsoft.net/utils/taskschedulerview-x64.zip', category: 'nirsoft' },
-  { name: 'JumpListsView', desc: 'View Windows Jump Lists', link: 'https://www.nirsoft.net/utils/jumplistsview-x64.zip', category: 'nirsoft' },
+  { name: 'JumpListsView', desc: 'View Windows Jump Lists', link: 'https://www.nirsoft.net/utils/jumplistsview.zip', category: 'nirsoft' },
   { name: 'WinPrefetchView', desc: 'View Windows Prefetch files', link: 'https://www.nirsoft.net/utils/winprefetchview-x64.zip', category: 'nirsoft' },
   { name: 'RegScanner', desc: 'Advanced Registry scanner', link: 'https://www.nirsoft.net/utils/regscanner-x64.zip', category: 'nirsoft' },
-  { name: 'ShellBagsView', desc: 'View ShellBags entries', link: 'https://www.nirsoft.net/utils/shellbagsview-x64.zip', category: 'nirsoft' },
+  { name: 'ShellBagsView', desc: 'View ShellBags entries', link: 'https://www.nirsoft.net/utils/shellbagsview.zip', category: 'nirsoft' },
  
   { name: 'AmcacheParser', desc: 'Parse Amcache.hve', link: 'https://download.ericzimmermanstools.com/net9/AmcacheParser.zip', category: 'ericzimmerman' },
   { name: 'bstrings', desc: 'String extractor', link: 'https://download.ericzimmermanstools.com/net9/bstrings.zip', category: 'ericzimmerman' },
@@ -553,7 +553,7 @@ function handleMessage(msg) {
         downloadedCache[msg.name] = true;
         updateProgress(msg.name, 100);
         completeToast(msg.name, true);
-        if (msg.exePath) {
+        if (msg.exePath && !msg.isZip) {
           if (batchDownloadActive) {
           } else {
             tryBridge('launchTool', msg.exePath);

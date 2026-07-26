@@ -413,7 +413,8 @@ void WebView2Manager::HandleJSMessage(const std::wstring& msg, ComPtr<ICoreWebVi
                     PostScriptToUIThread(L"window.handleCppMessage('" + escaped + L"')");
                 },
                 [this, name](const std::wstring&, bool success, const std::wstring& exePath) {
-                    std::wstring json = L"{\"type\":\"downloadComplete\",\"name\":\"" + EscapeJson(name) + L"\",\"success\":" + (success ? L"true" : L"false") + L",\"exePath\":\"" + EscapeJson(exePath) + L"\"}";
+                    bool isZip = success && exePath.size() > 4 && exePath.substr(exePath.size() - 4) == L".zip";
+                    std::wstring json = L"{\"type\":\"downloadComplete\",\"name\":\"" + EscapeJson(name) + L"\",\"success\":" + (success ? L"true" : L"false") + L",\"exePath\":\"" + EscapeJson(exePath) + L"\",\"isZip\":" + (isZip ? L"true" : L"false") + L"}";
                     std::wstring escaped; for (wchar_t c : json) { if (c == L'\\') escaped += L"\\\\"; else if (c == L'\'') escaped += L"\\'"; else escaped += c; }
                     PostScriptToUIThread(L"window.handleCppMessage('" + escaped + L"')");
                 }

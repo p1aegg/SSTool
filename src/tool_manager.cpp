@@ -169,7 +169,14 @@ void ToolManager::DownloadTool(const std::wstring& name, const std::vector<std::
     m_cancelCurrent = false;
     EnsureToolsDirectory(category);
 
-    std::wstring destPath = m_toolsPath + L"\\" + category + L"\\" + name + L".exe";
+    std::wstring ext = L".exe";
+    if (!urls.empty()) {
+        size_t dot = urls[0].find_last_of(L'.');
+        size_t slash = urls[0].find_last_of(L'/');
+        if (dot != std::wstring::npos && (slash == std::wstring::npos || dot > slash))
+            ext = urls[0].substr(dot);
+    }
+    std::wstring destPath = m_toolsPath + L"\\" + category + L"\\" + name + ext;
 
     std::thread([this, name, urls, category, destPath, onProgress, onComplete]() {
         HRESULT coInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
