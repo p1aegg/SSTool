@@ -1,6 +1,6 @@
 # SSTool — Forensic Tooling Suite
 
-A modern Windows desktop launcher for digital forensics tools, built with C++20, WebView2, and a space-themed UI.
+A modern Windows desktop launcher for digital forensics tools, built with C++20 and WebView2.
 
 ## Requirements
 
@@ -40,13 +40,13 @@ sstools/
 
 ## Architecture
 
-1. **Splash Screen** (native GDI+): Animated starfield with nebulas, shooting stars, spinner, and "Loading UI…" text while WebView2 initializes.
+1. **Splash Screen** (native GDI+): Animated loading screen with spinner and "Loading UI…" text while WebView2 initializes.
 
-2. **WebView2 UI**: Self-contained HTML file (`web/index.html`) loaded via virtual host mapping. Includes starry background, tabbed navigation, tool grid with hover tooltips, and a Terms of Service overlay.
+2. **WebView2 UI**: Self-contained HTML file (`web/index.html`) loaded via virtual host mapping. Tabbed navigation with a tool grid, categorized by tool author.
 
 3. **JS/C++ Bridge**: `AddHostObjectToScript` exposes bridge methods for download, launch, script execution, and window controls. C++ sends progress/completion events via `PostWebMessageAsJson`.
 
-4. **Tool Manager**: Downloads tools from GitHub releases using WinHTTP, manages the `./tools/` folder, and launches executables via `ShellExecuteEx`.
+4. **Tool Manager**: Downloads tools from GitHub releases using WinHTTP, manages the `./tools/{category}/` folder structure, and launches executables via `ShellExecuteEx`.
 
 ## Safety
 
@@ -55,6 +55,4 @@ sstools/
 - No silent execution — all operations are transparent.
 - Each tool is launched with a visible window.
 
-## Terms
 
-Tools are downloaded from official GitHub repositories. Each tool is maintained by its respective author. By using this software, you agree to the terms presented at first launch.
