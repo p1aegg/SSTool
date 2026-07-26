@@ -380,7 +380,10 @@ void WebView2Manager::HandleJSMessage(const std::wstring& msg, ComPtr<ICoreWebVi
                     return val;
                 }
                 found++;
-                while (a < msg.length() && msg[a] != L'"') a++;
+                while (a < msg.length() && msg[a] != L'"') {
+                    if (msg[a] == L'\\' && a + 1 < msg.length()) a += 2;
+                    else a++;
+                }
                 a++;
             } else {
                 a++;
