@@ -18,8 +18,8 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName",      "Orbdiff"
-            VALUE "FileDescription",  "SSTool - Forensic Tooling Suite"
+            VALUE "CompanyName",      "p1ae"
+            VALUE "FileDescription",  "SSTool - p1ae"
             VALUE "FileVersion",      "1.0.0"
             VALUE "InternalName",     "SSTool"
             VALUE "OriginalFilename", "SSTool.exe"

@@ -3,6 +3,8 @@
 #include <gdiplus.h>
 #include <shlwapi.h>
 #include <dwmapi.h>
+#include <urlmon.h>
+#include <webview2.h>
 #include <string>
 #include <memory>
 
@@ -12,6 +14,7 @@
 
 #pragma comment(lib, "gdiplus.lib")
 #pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "urlmon.lib")
 
 static constexpr wchar_t MAIN_WND_CLASS[] = L"SSToolMain";
 static constexpr int MIN_WIDTH = 640;
@@ -29,6 +32,10 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
     switch (msg) {
         case WM_CREATE: {
             g_mainHwnd = hwnd;
+
+            // Auto-install WebView2 Runtime if missing (blocks with message pumping)
+            EnsureWebView2Runtime();
+
             g_toolMgr = std::make_unique<ToolManager>();
             g_webview = std::make_unique<WebView2Manager>();
             g_webview->SetToolManager(g_toolMgr.get());
@@ -135,6 +142,63 @@ bool CreateMainWindow(HINSTANCE hInstance) {
     );
 
     return hwnd != nullptr;
+}
+
+// Check if WebView2 Runtime is installed; if not, download and install it silently.
+// Returns true if available (already installed or successfully installed).
+static bool EnsureWebView2Runtime() {
+    LPWSTR versionInfo = nullptr;
+    HRESULT hr = GetAvailableCoreWebView2BrowserVersionString(nullptr, &versionInfo);
+    bool installed = (hr == S_OK) && versionInfo && versionInfo[0];
+    CoTaskMemFree(versionInfo);
+    if (installed) return true;
+
+    // Download the Evergreen Bootstrapper
+    wchar_t tempDir[MAX_PATH];
+    if (!GetTempPathW(MAX_PATH, tempDir)) return false;
+
+    std::wstring bootstrapper = std::wstring(tempDir) + L"MicrosoftEdgeWebview2Setup.exe";
+    DeleteFileW(bootstrapper.c_str());
+
+    hr = URLDownloadToFileW(nullptr,
+        L"https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+        bootstrapper.c_str(), 0, nullptr);
+    if (FAILED(hr)) return false;
+
+    // Run installer silently and wait (pump messages so the splash stays alive)
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+    sei.lpVerb = L"open";
+    sei.lpFile = bootstrapper.c_str();
+    sei.lpParameters = L"/silent /install";
+    sei.nShow = SW_HIDE;
+
+    if (!ShellExecuteExW(&sei)) {
+        DeleteFileW(bootstrapper.c_str());
+        return false;
+    }
+
+    // Pump messages while waiting so the splash window can still paint
+    for (;;) {
+        DWORD wr = MsgWaitForMultipleObjects(1, &sei.hProcess, FALSE, 60000, QS_ALLINPUT);
+        if (wr == WAIT_OBJECT_0 + 1) {
+            MSG msg;
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        } else {
+            break;
+        }
+    }
+    CloseHandle(sei.hProcess);
+    DeleteFileW(bootstrapper.c_str());
+
+    // Verify installation
+    hr = GetAvailableCoreWebView2BrowserVersionString(nullptr, &versionInfo);
+    installed = (hr == S_OK) && versionInfo && versionInfo[0];
+    CoTaskMemFree(versionInfo);
+    return installed;
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
