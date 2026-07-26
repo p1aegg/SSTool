@@ -28,6 +28,8 @@ static bool g_webViewReady = false;
 
 static ULONG_PTR g_gdiplusToken = 0;
 
+static bool EnsureWebView2Runtime();
+
 LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CREATE: {
