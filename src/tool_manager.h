@@ -25,7 +25,7 @@ public:
 
     std::wstring GetToolsPath() const;
 
-    void DownloadTool(const std::wstring& name, const std::wstring& url,
+    void DownloadTool(const std::wstring& name, const std::vector<std::wstring>& urls,
                       const std::wstring& category,
                       ProgressCallback onProgress, CompleteCallback onComplete);
 

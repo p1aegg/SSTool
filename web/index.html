@@ -235,7 +235,12 @@ const tools = [
   { name: 'Everything', desc: 'Locate files and folders by name instantly.', link: 'https://www.voidtools.com/Everything-1.4.1.1032.x64-Setup.exe', category: 'others' },
   { name: 'HxD', desc: 'HxD Hex Editor', link: 'https://mh-nexus.de/downloads/HxDSetup.zip', category: 'others' },
   { name: 'P1AE Javaw', desc: 'Best Javaw scanner', link: 'https://github.com/p1aegg/javaw/releases/download/v1.9/P1AE.Javaw.exe', category: 'others' },
+  { name: 'Macro Scanner', desc: 'Lafferr Macro Scanner', link: 'https://github.com/Lafferrr/MacroScanner/releases/download/MS/MacroScanner.exe', category: 'others' },
+  { name: 'String Checker', desc: 'Lafferrs Strings Checker', link: 'https://github.com/Lafferrr/SSTools/raw/refs/heads/main/SSTools/Strings/LaffersStringsChecker.exe', category: 'others' },
+  { name: 'Java Library Analyzer', desc: 'Lafferr Java Library Analyzer', link: ['https://github.com/Lafferrr/SSTools/raw/refs/heads/main/SSTools/JavaLibraryAnalyzer/JavaLibraryAnalyzer.exe', 'https://github.com/Lafferrr/SSTools/raw/refs/heads/main/SSTools/JavaLibraryAnalyzer/library_baseline.bin', 'https://github.com/Lafferrr/SSTools/raw/refs/heads/main/SSTools/JavaLibraryAnalyzer/natives_baseline.bin'], category: 'others' },
+  { name: 'PJ Cheat Scanner Lite', desc: 'String Checker', link: ['https://github.com/gorbgallin/Pj-sCheatScannerLite/releases/download/1.1/PjCheatScannerLite.exe', 'https://github.com/gorbgallin/Pj-sCheatScannerLite/releases/download/1.1/cheat_strings.txt'], category: 'others' },
 
+  { name: 'NET 8.0', desc: 'Install .NET 8.0 runtime', link: 'https://dotnet.microsoft.com/en-us/download/dotnet/thank-you/sdk-8.0.423-windows-x64-installer', category: 'dependencies' },
   { name: 'NET 9.0', desc: 'Install .NET 9.0 runtime', link: 'https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/9.0.11/windowsdesktop-runtime-9.0.11-win-x64.exe', category: 'dependencies' },
   { name: 'NET 10.0', desc: 'Install .NET 10.0 runtime', link: 'https://builds.dotnet.microsoft.com/dotnet/WindowsDesktop/10.0.10/windowsdesktop-runtime-10.0.10-win-x64.exe', category: 'dependencies' },
   { name: 'VSRedist', desc: 'Install Visual C++ Redistributable', link: 'https://aka.ms/vc14/vc_redist.x64.exe', category: 'dependencies' },
@@ -257,6 +262,8 @@ const scripts = [
   { name: 'Meow Mod Analyzer', desc: 'Runs MeowTonynoh mod analyzer', cmd: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/MeowTonynoh/MeowModAnalyzer/main/MeowModAnalyzer.ps1')" },
   { name: 'Prefetch Integrity Analyzer', desc: 'Analyzes prefetch integrity (RedLotus)', cmd: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/bacanoicua/Screenshare/main/RedLotusPrefetchIntegrityAnalyzer.ps1')" },
   { name: 'RecordingKiller', desc: 'Kill recording processes', cmd: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/Orbdiff/powershell/refs/heads/main/kill-screen-processes.ps1')" },
+  { name: 'Lily Services', desc: 'Runs PraiseLilys services checker', cmd: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/Lafferrr/SSTools/refs/heads/main/LilysServices')" },
+  { name: 'Lily Services Enabler', desc: 'Runs services enabler', cmd: "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/Lafferrr/SSTools/refs/heads/main/LilysServicesEnabler')" },
 ];
 
 let activeTab = 'orbdiff';
@@ -371,11 +378,11 @@ function handleToolClick(item) {
   }
 
   const name = item.name;
-  const url = item.link;
+  const urls = Array.isArray(item.link) ? item.link : [item.link];
 
   updateIndicator(name, 'downloading');
   showToast(name);
-  tryBridge('downloadTool', name, url, item.category || activeTab);
+  tryBridge('downloadTool', name, JSON.stringify(urls), item.category || activeTab);
 }
 
 const toastTimers = {};
@@ -395,7 +402,7 @@ function showToast(name) {
   }
   el.className = 'dl-toast downloading';
   el.innerHTML =
-    '<div class="dl-toast-text"><span class="dl-toast-tag">[0%]</span>Downloading ' + name + '.exe</div>' +
+    '<div class="dl-toast-text"><span class="dl-toast-tag">[0%]</span>Downloading ' + name + '</div>' +
     '<div class="dl-toast-bar"><div class="dl-toast-fill indeterminate"></div></div>';
 }
 
@@ -420,8 +427,8 @@ function completeToast(name, success) {
   if (!el) return;
   el.className = 'dl-toast ' + (success ? 'success' : 'error');
   el.innerHTML = success
-    ? '<div class="dl-toast-text"><span class="dl-toast-tag">[+]</span>' + name + '.exe saved</div>'
-    : '<div class="dl-toast-text"><span class="dl-toast-tag">[-]</span>' + name + '.exe failed</div>';
+    ? '<div class="dl-toast-text"><span class="dl-toast-tag">[+]</span>' + name + ' saved</div>'
+    : '<div class="dl-toast-text"><span class="dl-toast-tag">[-]</span>' + name + ' failed</div>';
   toastTimers[name] = setTimeout(() => {
     el.classList.add('closing');
     setTimeout(() => el.remove(), 200);
@@ -438,7 +445,7 @@ function showConfirm(name, exePath) {
   overlay.classList.add('show');
   document.getElementById('confirmTitle').textContent = 'Launch ' + name;
   document.getElementById('confirmBody').textContent =
-    'This will run ' + name + '.exe from the tools folder. Proceed?';
+    'This will run ' + name + ' from the tools folder. Proceed?';
   pendingLaunch = { name, exePath };
 }
 

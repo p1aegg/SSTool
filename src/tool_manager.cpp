@@ -156,26 +156,50 @@ if (cancelled) {
     return result;
 }
 
-void ToolManager::DownloadTool(const std::wstring& name, const std::wstring& url,
+static std::wstring ExtractFilenameFromUrl(const std::wstring& url) {
+    size_t slash = url.find_last_of(L'/');
+    if (slash != std::wstring::npos && slash + 1 < url.length())
+        return url.substr(slash + 1);
+    return url;
+}
+
+void ToolManager::DownloadTool(const std::wstring& name, const std::vector<std::wstring>& urls,
                                 const std::wstring& category,
                                 ProgressCallback onProgress, CompleteCallback onComplete) {
     m_cancelCurrent = false;
     EnsureToolsDirectory(category);
 
-    std::wstring exeName = name + L".exe";
-    std::wstring destPath = m_toolsPath + L"\\" + category + L"\\" + exeName;
+    std::wstring destPath = m_toolsPath + L"\\" + category + L"\\" + name + L".exe";
 
-    std::thread([this, url, destPath, name, onProgress, onComplete]() {
+    std::thread([this, name, urls, category, destPath, onProgress, onComplete]() {
         HRESULT coInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
-        if (onProgress) onProgress(name, 0, L"Starting download...", 0);
+        bool allSuccess = true;
+        int totalFiles = (int)urls.size();
 
-        auto namedProgress = [name, onProgress](const std::wstring&, int value,
-                                                  const std::wstring& status, int totalSize) {
-            if (onProgress) onProgress(name, value, status, totalSize);
-        };
+        for (int i = 0; i < totalFiles; i++) {
+            if (m_cancelCurrent) { allSuccess = false; break; }
 
-        bool success = DownloadFile(url, destPath, namedProgress);
+            std::wstring destFile = (i == 0)
+                ? destPath
+                : (m_toolsPath + L"\\" + category + L"\\" + ExtractFilenameFromUrl(urls[i]));
+
+            if (onProgress) {
+                std::wstring status = L"[" + std::to_wstring(i + 1) + L"/" + std::to_wstring(totalFiles) + L"]";
+                onProgress(name, 0, status, 0);
+            }
+
+            auto fileProgress = [name, i, totalFiles, onProgress](const std::wstring&, int value,
+                                                                    const std::wstring&, int totalSize) {
+                if (onProgress) {
+                    std::wstring s = L"[" + std::to_wstring(i + 1) + L"/" + std::to_wstring(totalFiles) + L"]";
+                    onProgress(name, value, s, totalSize);
+                }
+            };
+
+            bool success = DownloadFile(urls[i], destFile, fileProgress);
+            if (!success) { allSuccess = false; break; }
+        }
 
         if (m_cancelCurrent) {
             if (onComplete) onComplete(name, false, L"");
@@ -183,7 +207,7 @@ void ToolManager::DownloadTool(const std::wstring& name, const std::wstring& url
             return;
         }
 
-        if (onComplete) onComplete(name, success, success ? destPath : L"");
+        if (onComplete) onComplete(name, allSuccess, allSuccess ? destPath : L"");
 
         if (SUCCEEDED(coInit)) CoUninitialize();
     }).detach();

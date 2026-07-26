@@ -334,6 +334,21 @@ void WebView2Manager::HandleRemoteHtmlFetched(const std::wstring& html, bool suc
     }
 }
 
+static std::vector<std::wstring> ParseUrlArray(const std::wstring& json) {
+    std::vector<std::wstring> urls;
+    if (json.empty()) return urls;
+    if (json[0] != L'[') { urls.push_back(json); return urls; }
+    size_t pos = 0;
+    while ((pos = json.find(L'"', pos)) != std::wstring::npos) {
+        pos++;
+        size_t end = json.find(L'"', pos);
+        if (end == std::wstring::npos) break;
+        urls.push_back(json.substr(pos, end - pos));
+        pos = end + 1;
+    }
+    return urls;
+}
+
 void WebView2Manager::HandleJSMessage(const std::wstring& msg, ComPtr<ICoreWebView2> webView) {
     auto extractMethod = [&]() -> std::wstring {
         auto m = msg.find(L"\"method\":\"");
@@ -379,13 +394,16 @@ void WebView2Manager::HandleJSMessage(const std::wstring& msg, ComPtr<ICoreWebVi
 
     if (method == L"downloadTool") {
         std::wstring name = extractArg(0);
-        std::wstring url = extractArg(1);
+        std::wstring urlsJson = extractArg(1);
         std::wstring category = extractArg(2);
-        if (name.empty() || url.empty()) return;
+        if (name.empty() || urlsJson.empty()) return;
         if (category.empty()) category = L"unknown";
 
+        std::vector<std::wstring> urls = ParseUrlArray(urlsJson);
+        if (urls.empty()) return;
+
         if (m_toolManager) {
-            m_toolManager->DownloadTool(name, url, category,
+            m_toolManager->DownloadTool(name, urls, category,
                 [this, name](const std::wstring&, int value, const std::wstring& status, int totalSize) {
                     std::wstring json = L"{\"type\":\"progress\",\"name\":\"" + EscapeJson(name) + L"\",\"value\":" + std::to_wstring(value) + L",\"totalSize\":" + std::to_wstring(totalSize) + L",\"status\":\"" + EscapeJson(status) + L"\"}";
                     std::wstring escaped; for (wchar_t c : json) { if (c == L'\\') escaped += L"\\\\"; else if (c == L'\'') escaped += L"\\'"; else escaped += c; }
@@ -475,3 +493,4 @@ void WebView2Manager::HandleJSMessage(const std::wstring& msg, ComPtr<ICoreWebVi
         if (m_toolManager) m_toolManager->CancelCurrentDownload();
     }
 }
+    // ... existing method/arg extraction ...
