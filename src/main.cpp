@@ -38,7 +38,18 @@ LRESULT CALLBACK MainWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             EnsureWebView2Runtime();
 
             g_toolMgr = std::make_unique<ToolManager>();
-            g_toolMgr->AddDefenderExclusion();
+
+            // ---------------------------------------------------------------
+            // REMOVED: g_toolMgr->AddDefenderExclusion()
+            //
+            // Silently adding a Defender exclusion on startup is the primary
+            // reason AV engines flagged this binary.  The exclusion is now
+            // opt-in: the user clicks "Add AV Exclusion" in the UI, which
+            // sends an "addDefenderExclusion" JS message to webview_manager,
+            // which calls g_toolMgr->RequestDefenderExclusion(hwnd).  That
+            // function shows a visible UAC prompt and a readable PS window.
+            // ---------------------------------------------------------------
+
             g_webview = std::make_unique<WebView2Manager>();
             g_webview->SetToolManager(g_toolMgr.get());
 

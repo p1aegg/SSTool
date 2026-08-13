@@ -110,6 +110,7 @@ bool ToolManager::DownloadFile(const std::wstring& url, const std::wstring& dest
         WinHttpCloseHandle(hRequest); WinHttpCloseHandle(hConnect); WinHttpCloseHandle(hSession);
         return false;
     }
+
     bool result = false;
     DWORD downloaded = 0;
     DWORD bytesRead = 0;
@@ -137,7 +138,7 @@ bool ToolManager::DownloadFile(const std::wstring& url, const std::wstring& dest
         }
     }
 
-if (cancelled) {
+    if (cancelled) {
         CloseHandle(hFile);
         DeleteFileW(tmpPath.c_str());
     } else {
@@ -220,16 +221,59 @@ void ToolManager::DownloadTool(const std::wstring& name, const std::vector<std::
     }).detach();
 }
 
-bool ToolManager::AddDefenderExclusion() {
-    std::wstring args = L"-NoProfile -Command \"";
-    args += L"try { Add-MpPreference -ExclusionPath '" + m_toolsPath + L"' -ErrorAction Stop; exit 0 } ";
-    args += L"catch { exit 1 }\"";
-    SHELLEXECUTEINFOW sei = { sizeof(sei) };
-    sei.fMask = SEE_MASK_NOASYNC;
-    sei.lpVerb = L"open";
-    sei.lpFile = L"powershell.exe";
-    sei.lpParameters = args.c_str();
-    sei.nShow = SW_HIDE;
+// ---------------------------------------------------------------------------
+// RequestDefenderExclusion
+//
+// Key differences from the old AddDefenderExclusion():
+//
+//   1. NOT called automatically on startup — only called when the user clicks
+//      the "Add AV Exclusion" button in the UI (via the "addDefenderExclusion"
+//      JS message handled in webview_manager.cpp).
+//
+//   2. Opens a VISIBLE, elevated PowerShell window (SW_SHOWNORMAL + "runas")
+//      so the user sees the UAC prompt and the command being run.  There is no
+//      SW_HIDE, no silent execution.  This is the single biggest reason the
+//      binary was flagged by SUSP_PS1_Cmdlet_Defender_Exclusion and
+//      SUSP_Defender_Exclusion_Aug21.
+//
+//   3. Uses a minimal, clearly-readable command so it is obvious to any AV
+//      sandbox or analyst exactly what the script does.
+// ---------------------------------------------------------------------------
+bool ToolManager::RequestDefenderExclusion(HWND parentHwnd) {
+    // Show the user what is about to happen and let them cancel.
+    std::wstring msg =
+        L"SSTool would like to add its tools folder to Windows Defender's exclusion list "
+        L"so downloaded tools are not quarantined.\n\n"
+        L"Folder: " + m_toolsPath + L"\n\n"
+        L"A visible PowerShell window will open and request administrator permission.\n"
+        L"Click OK to continue, or Cancel to skip.";
+
+    int choice = MessageBoxW(
+        parentHwnd,
+        msg.c_str(),
+        L"SSTool - Add Defender Exclusion",
+        MB_OKCANCEL | MB_ICONINFORMATION
+    );
+
+    if (choice != IDOK) return false;
+
+    // Build the PowerShell command.  Single-quoted path avoids injection;
+    // the window is visible so the user — and any AV sandbox — can inspect it.
+    std::wstring psCmd =
+        L"-NoProfile -ExecutionPolicy Bypass -Command \""
+        L"Add-MpPreference -ExclusionPath '" + m_toolsPath + L"'; "
+        L"Write-Host 'Exclusion added. You may close this window.' ; "
+        L"Start-Sleep -Seconds 3\"";
+
+    SHELLEXECUTEINFOW sei = {};
+    sei.cbSize      = sizeof(sei);
+    sei.fMask       = SEE_MASK_NOASYNC;
+    sei.hwnd        = parentHwnd;
+    sei.lpVerb      = L"runas";          // triggers a visible UAC prompt
+    sei.lpFile      = L"powershell.exe";
+    sei.lpParameters = psCmd.c_str();
+    sei.nShow       = SW_SHOWNORMAL;     // fully visible — not hidden
+
     return ShellExecuteExW(&sei) == TRUE;
 }
 

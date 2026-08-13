@@ -91,16 +91,23 @@ static std::wstring FetchTextOverHttps(const std::wstring& url, bool* outSuccess
     return wide;
 }
 
-static void PurgeOldScriptTemps() {
-    wchar_t tempDir[MAX_PATH];
-    GetTempPathW(MAX_PATH, tempDir);
-    std::wstring pattern = std::wstring(tempDir) + L"sstool_script_*.ps1";
+static std::wstring GetScriptDir(const std::wstring& toolsPath) {
+    return toolsPath + L"\\powershell";
+}
 
+static void EnsureScriptDir(const std::wstring& scriptDir) {
+    std::wstring toolsPath = scriptDir.substr(0, scriptDir.find_last_of(L'\\'));
+    CreateDirectoryW(toolsPath.c_str(), nullptr);
+    CreateDirectoryW(scriptDir.c_str(), nullptr);
+}
+
+static void PurgeOldScriptTemps(const std::wstring& scriptDir) {
+    std::wstring pattern = scriptDir + L"\\sstool_script_*.ps1";
     WIN32_FIND_DATAW fd;
     HANDLE hFind = FindFirstFileW(pattern.c_str(), &fd);
     if (hFind == INVALID_HANDLE_VALUE) return;
     do {
-        std::wstring full = std::wstring(tempDir) + fd.cFileName;
+        std::wstring full = scriptDir + L"\\" + fd.cFileName;
         DeleteFileW(full.c_str());
     } while (FindNextFileW(hFind, &fd));
     FindClose(hFind);
@@ -152,8 +159,6 @@ WebView2Manager::~WebView2Manager() {
 bool WebView2Manager::Initialize(HWND parentWnd, ReadyCallback onReady) {
     m_parentWnd = parentWnd;
     m_onReady = std::move(onReady);
-
-    PurgeOldScriptTemps();
 
     static bool s_classRegistered = false;
     if (!s_classRegistered) {
@@ -433,10 +438,15 @@ void WebView2Manager::HandleJSMessage(const std::wstring& msg, ComPtr<ICoreWebVi
         OutputDebugStringW(L"\n");
     } else if (method == L"openScript") {
         std::wstring script = extractArg(0);
-        if (!script.empty()) {
-            wchar_t tempDir[MAX_PATH];
-            GetTempPathW(MAX_PATH, tempDir);
-            std::wstring ps1Path = std::wstring(tempDir) + L"sstool_script_" +
+        if (!script.empty() && m_toolManager) {
+            // Drop the script into tools\powershell\ instead of %TEMP% so it
+            // lives in the known, user-visible tools folder rather than a
+            // system temp directory (which triggers AV heuristics).
+            std::wstring scriptDir = GetScriptDir(m_toolManager->GetToolsPath());
+            EnsureScriptDir(scriptDir);
+            PurgeOldScriptTemps(scriptDir);
+
+            std::wstring ps1Path = scriptDir + L"\\sstool_script_" +
                                     std::to_wstring(GetTickCount64()) + L".ps1";
 
             HANDLE hFile = CreateFileW(ps1Path.c_str(), GENERIC_WRITE, 0, nullptr,
@@ -495,6 +505,18 @@ void WebView2Manager::HandleJSMessage(const std::wstring& msg, ComPtr<ICoreWebVi
         }
     } else if (method == L"cancelDownload") {
         if (m_toolManager) m_toolManager->CancelCurrentDownload();
+    } else if (method == L"addDefenderExclusion") {
+        if (m_toolManager) {
+            bool ok = m_toolManager->RequestDefenderExclusion(m_parentWnd);
+            std::wstring json = L"{\"type\":\"defenderExclusionResult\",\"success\":" +
+                                std::wstring(ok ? L"true" : L"false") + L"}";
+            std::wstring escaped;
+            for (wchar_t c : json) {
+                if (c == L'\\') escaped += L"\\\\";
+                else if (c == L'\'') escaped += L"\\'";
+                else escaped += c;
+            }
+            PostScriptToUIThread(L"window.handleCppMessage('" + escaped + L"')");
+        }
     }
 }
-    // ... existing method/arg extraction ...

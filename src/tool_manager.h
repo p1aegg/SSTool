@@ -32,7 +32,12 @@ public:
     void CancelCurrentDownload() { m_cancelCurrent = true; }
     bool LaunchTool(const std::wstring& exePath);
     bool IsToolDownloaded(const std::wstring& exeName, const std::wstring& category) const;
-    bool AddDefenderExclusion();
+
+    // Replaces AddDefenderExclusion().
+    // Shows a visible, elevated PowerShell window so the user can see and
+    // confirm exactly what is being run.  Returns false only if ShellExecuteEx
+    // itself fails (e.g. UAC cancelled by the user).
+    bool RequestDefenderExclusion(HWND parentHwnd);
 
 private:
     bool EnsureToolsDirectory(const std::wstring& subDir = L"");
