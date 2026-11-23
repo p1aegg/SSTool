@@ -31,6 +31,15 @@ html,body{height:100%;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
 .content-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px}
 .content-header h1{font-size:13px;font-weight:400;color:#d4d4d4}
 .content-header h1 span{color:#a3a3a3}
+.search-box{position:relative;flex:1;max-width:280px;margin:0 16px 0 auto}
+.search-box .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#737373;pointer-events:none;display:flex}
+.search-box input{width:100%;height:30px;padding:0 28px 0 30px;font-family:inherit;font-size:12px;color:#e5e5e5;background:rgba(18,18,18,0.88);border:1px solid #2a2a2a;border-radius:4px;outline:none;user-select:text;-webkit-user-select:text;transition:border-color 0.15s,box-shadow 0.15s}
+.search-box input::placeholder{color:#737373}
+.search-box input:focus{border-color:rgba(184,74,255,0.6);box-shadow:0 0 10px rgba(184,74,255,0.2)}
+.search-box .search-clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center;width:18px;height:18px;border:none;border-radius:50%;background:transparent;color:#a3a3a3;cursor:pointer;padding:0}
+.search-box .search-clear:hover{color:#ddaaff;background:rgba(221,170,255,0.12)}
+.search-box.has-text .search-clear{display:flex}
+.tool-card .cat-tag{position:absolute;bottom:9px;right:10px;font-size:10px;color:#ddaaff;opacity:0.7;letter-spacing:0.3px}
 .btn-dl-all{font-size:12px;padding:6px 14px;border:1px solid rgba(221,170,255,0.4);border-radius:4px;background:transparent;color:#ddaaff;cursor:pointer;transition:background 0.15s;box-shadow:0 0 8px rgba(221,170,255,0.15);font-family:inherit}
 .btn-dl-all:hover{background:rgba(221,170,255,0.12)}
 
@@ -91,7 +100,7 @@ html,body{height:100%;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
 @media(max-width:420px){.tool-grid{grid-template-columns:1fr}}
 </style>
 </head>
-<body onselectstart="return false">
+<body>
 
 <div id="app">
   <div class="drag-handle" id="dragHandle">
@@ -106,6 +115,11 @@ html,body{height:100%;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
 
   <div class="content-header">
     <h1 id="section-heading"></h1>
+    <div class="search-box" id="searchBox">
+      <span class="search-icon"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+      <input type="text" id="searchInput" placeholder="Search all tools…  ( / )" autocomplete="off" spellcheck="false" oninput="onSearchInput(this.value)">
+      <button class="search-clear" type="button" onclick="clearSearch(true)" title="Clear"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
     <button class="btn-dl-all" id="btn-dl-all" onclick="downloadAllTools()">Download All</button>
   </div>
 
@@ -269,6 +283,7 @@ const scripts = [
 ];
 
 let activeTab = 'orbdiff';
+let searchQuery = '';
 let cooldowns = {};
 let batchDownloadActive = false;
 let batchPending = new Set();
@@ -278,7 +293,23 @@ let mockInterval = null;
 const downloadedCache = {};
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.addEventListener('selectstart', (e) => e.preventDefault());
+  document.addEventListener('selectstart', (e) => {
+    const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+    if (el && el.closest('.search-box')) return;
+    e.preventDefault();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const input = document.getElementById('searchInput');
+    const typing = document.activeElement === input;
+    if ((e.key === '/' && !typing) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f')) {
+      e.preventDefault();
+      input.focus();
+      input.select();
+    } else if (e.key === 'Escape' && typing) {
+      if (input.value) clearSearch(false); else input.blur();
+    }
+  });
 
   const handle = document.getElementById('dragHandle');
   if (handle) {
@@ -295,7 +326,7 @@ function renderTabs() {
   bar.innerHTML = '';
   tabs.forEach(t => {
     const btn = document.createElement('button');
-    btn.className = 'tab-btn' + (t.key === activeTab ? ' active' : '');
+    btn.className = 'tab-btn' + (!searchQuery && t.key === activeTab ? ' active' : '');
     btn.innerHTML = t.icon + (t.label ? '<span>' + t.label + '</span>' : '');
     btn.onclick = () => switchTab(t.key);
     bar.appendChild(btn);
@@ -304,11 +335,44 @@ function renderTabs() {
 
 function switchTab(key) {
   activeTab = key;
+  searchQuery = '';
+  const input = document.getElementById('searchInput');
+  if (input) input.value = '';
+  document.getElementById('searchBox').classList.remove('has-text');
   renderTabs();
   renderTools();
-  document.getElementById('btn-dl-all').style.display = (activeTab === 'scripts' ? 'none' : '');
-  const t = tabs.find(t => t.key === key);
-  if (t && t.header) document.getElementById('section-heading').innerHTML = t.header;
+}
+
+function onSearchInput(value) {
+  searchQuery = value.trim();
+  document.getElementById('searchBox').classList.toggle('has-text', value.length > 0);
+  renderTabs();
+  renderTools();
+  document.getElementById('toolGrid').scrollTop = 0;
+}
+
+function clearSearch(refocus) {
+  const input = document.getElementById('searchInput');
+  input.value = '';
+  onSearchInput('');
+  if (refocus) input.focus();
+}
+
+function applyHeader(resultCount) {
+  const heading = document.getElementById('section-heading');
+  const dlAll = document.getElementById('btn-dl-all');
+  if (searchQuery) {
+    heading.innerHTML = 'Search results — <span>' + resultCount + (resultCount === 1 ? ' tool' : ' tools') + '</span>';
+    dlAll.style.display = 'none';
+  } else {
+    const t = tabs.find(t => t.key === activeTab);
+    if (t && t.header) heading.innerHTML = t.header;
+    dlAll.style.display = (activeTab === 'scripts' ? 'none' : '');
+  }
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function renderTools() {
@@ -316,7 +380,16 @@ function renderTools() {
   grid.innerHTML = '';
 
   let items;
-  if (activeTab === 'scripts') {
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    const labelOf = key => (tabs.find(t => t.key === key) || {}).label || key;
+    const all = tools.map(t => ({ ...t }))
+      .concat(scripts.map(s => ({ ...s, isScript: true, category: 'scripts' })));
+    items = all
+      .filter(i => i.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    items.forEach(i => { i._catLabel = labelOf(i.category); });
+  } else if (activeTab === 'scripts') {
     items = scripts.map(s => ({ ...s, isScript: true })).sort((a, b) => a.name.localeCompare(b.name));
   } else {
     items = tools.filter(t => t.category === activeTab);
@@ -325,20 +398,24 @@ function renderTools() {
     }
   }
 
+  applyHeader(items.length);
+
   if (items.length === 0) {
-    grid.innerHTML = '<div class="empty-state">' + icons.asterisk + '<span>No tools in this category</span></div>';
+    const msg = searchQuery ? 'No tools match “' + escapeHtml(searchQuery) + '”' : 'No tools in this category';
+    grid.innerHTML = '<div class="empty-state">' + (searchQuery ? icons.search : icons.asterisk) + '<span>' + msg + '</span></div>';
     return;
   }
 
   items.forEach(item => {
     const card = document.createElement('div');
     card.className = 'tool-card';
-    card.dataset.name = item.name || item.name;
+    card.dataset.name = item.name;
 
     let html = '<div class="name">' + (item.name || item.name) + '</div>';
     html += '<div class="desc">' + (item.desc || '') + '</div>';
-    html += '<div class="dl-indicator" id="dl-' + (item.name || item.name) + '"></div>';
-    html += '<div class="progress-wrap"><div class="progress-bar" id="prog-' + (item.name || item.name) + '"></div></div>';
+    html += '<div class="dl-indicator"></div>';
+    html += '<div class="progress-wrap"><div class="progress-bar"></div></div>';
+    if (searchQuery && item._catLabel) html += '<div class="cat-tag">' + item._catLabel + '</div>';
 
     card.innerHTML = html;
     card.onclick = () => handleToolClick(item);
@@ -348,26 +425,36 @@ function renderTools() {
   });
 }
 
+function cardsByName(name) {
+  return Array.from(document.querySelectorAll('.tool-card')).filter(c => c.dataset.name === name);
+}
+
 function updateIndicator(name, state) {
-  const dot = document.getElementById('dl-' + name);
-  if (!dot) return;
-  dot.className = 'dl-indicator';
-  if (state === 'downloaded') dot.classList.add('downloaded');
-  else if (state === 'downloading') dot.classList.add('downloading');
+  cardsByName(name).forEach(card => {
+    const dot = card.querySelector('.dl-indicator');
+    if (!dot) return;
+    dot.className = 'dl-indicator';
+    if (state === 'downloaded') dot.classList.add('downloaded');
+    else if (state === 'downloading') dot.classList.add('downloading');
+  });
 }
 
 function updateProgress(name, percent) {
-  const bar = document.getElementById('prog-' + name);
-  if (bar) {
-    bar.classList.remove('indeterminate');
-    bar.style.width = Math.min(percent, 100) + '%';
-  }
+  cardsByName(name).forEach(card => {
+    const bar = card.querySelector('.progress-bar');
+    if (bar) {
+      bar.classList.remove('indeterminate');
+      bar.style.width = Math.min(percent, 100) + '%';
+    }
+  });
   updateIndicator(name, 'downloading');
 }
 
 function updateProgressIndeterminate(name) {
-  const bar = document.getElementById('prog-' + name);
-  if (bar) bar.classList.add('indeterminate');
+  cardsByName(name).forEach(card => {
+    const bar = card.querySelector('.progress-bar');
+    if (bar) bar.classList.add('indeterminate');
+  });
   updateIndicator(name, 'downloading');
 }
 
